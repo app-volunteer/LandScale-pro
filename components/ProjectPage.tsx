@@ -17,6 +17,35 @@ import {
 } from "lucide-react";
 import { Document, Packer, Paragraph, HeadingLevel, AlignmentType } from "docx";
 import saveAs from "file-saver";
+import axios from "axios";
+const publicKey = import.meta.env.VITE_ILOVEPDF_PUBLIC;
+const secretKey = import.meta.env.VITE_ILOVEPDF_SECRET;
+
+
+const convertHtmlToWord = async (htmlContent: string) => {
+  try {
+    const response = await axios.post(
+      "https://api.ilovepdf.com/v1/html/office",
+      {
+        html: htmlContent,
+        output_format: "docx",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_ILOVEPDF_SECRET}`,
+        },
+      }
+    );
+
+    return response.data.download_url;
+  } catch (error) {
+    console.error("iLovePDF conversion error:", error);
+    throw error;
+  }
+};
+
+
 
 interface ProjectPageProps {
   user: FirebaseUser;
@@ -59,32 +88,67 @@ export default function ProjectPage({ user, onLogout }: ProjectPageProps) {
     }
   };
 
-  const generateWord = async () => {
-    const docFile = new Document({
-      sections: [{
-        children: [
-          new Paragraph({ text: "Land Measurement Report", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
-          new Paragraph({ text: `Surveyor: ${user.displayName || "N/A"}`, spacing: { after: 120 } }),
-          new Paragraph({ text: `Date: ${new Date().toLocaleDateString()}`, spacing: { after: 400 } }),
-          new Paragraph({ text: "Primary Metric: " + formData.measurement1 }),
-          new Paragraph({ text: "Boundary Perimeter: " + formData.measurement2 }),
-          new Paragraph({ text: "Observations: " + formData.notes }),
-        ],
-      }],
-    });
-    const blob = await Packer.toBlob(docFile);
-    saveAs(blob, "LandScale_Report.docx");
+const generateWord = async () => {
+  const element = document.getElementById("preview-content");
+  if (!element) return;
+
+  const htmlContent = element.outerHTML;
+
+  try {
+    const downloadUrl = await convertHtmlToWord(htmlContent);
+
+    // Download the Word file
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "LandScale_Report.docx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+  } catch (error) {
+    alert("Error generating Word document");
+  }
+};
+
+
+const generatePDF = () => {
+  const element = document.getElementById("preview-content");
+  if (!element) return;
+
+  const html2pdf = (window as any).html2pdf;
+  if (!html2pdf) {
+    alert("PDF library not loaded yet.");
+    return;
+  }
+
+  // Clone to avoid UI flicker
+  const clone = element.cloneNode(true) as HTMLElement;
+
+  clone.style.width = "210mm";     // A4 width
+  clone.style.minHeight = "297mm";
+  clone.style.padding = "20mm";
+  clone.style.background = "white";
+
+  const opt = {
+    margin: 0,
+    filename: "LandScale_Report.pdf",
+    image: { type: "jpeg", quality: 1 },
+    html2canvas: {
+      scale: 3,            // 🔥 KEY FOR ACCURACY
+      useCORS: true,
+      letterRendering: true,
+      scrollY: 0,
+    },
+    jsPDF: {
+      unit: "mm",
+      format: "a4",
+      orientation: "portrait",
+    },
   };
 
-  const generatePDF = () => {
-    const element = document.getElementById("preview-content");
-    const html2pdf = (window as any).html2pdf;
-    if (!html2pdf) {
-      alert("PDF library not loaded yet.");
-      return;
-    }
-    html2pdf().from(element).set({ margin: 20, filename: 'Report.pdf', jsPDF: { unit: 'mm', format: 'a4' }}).save();
-  };
+  html2pdf().set(opt).from(clone).save();
+};
+
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
