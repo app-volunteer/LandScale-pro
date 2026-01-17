@@ -1,13 +1,24 @@
 
 export interface FirebaseUser {
   uid: string;
-  email: string | null;
   displayName: string | null;
+  email: string | null;
   photoURL?: string | null;
 }
 
-export interface LandReportData {
-  measurement1: string;
-  measurement2: string;
-  notes: string;
+export interface Template {
+  id: string;
+  name: string;
+  html: string;
+}
+
+export interface Project {
+  id?: string;
+  userId?: string;
+  templateId: string;
+  templateName: string;
+  formData: Record<string, string>;
+  filledHtml: string;
+  createdAt: any;
+  userName?: string | null;
 }
